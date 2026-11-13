@@ -4,7 +4,7 @@
 
 A launcher, graphics settings and small diagnostic tools preserved from a Steam Spore: Galactic Adventures setup on an Apple silicon Mac.
 
-**[Download v0.1.0 source](https://github.com/vkupyansky/spore-crossover-kit/releases/download/v0.1.0/spore-crossover-kit-0.1.0-source.tar.gz)** · [Release and SHA256SUMS](https://github.com/vkupyansky/spore-crossover-kit/releases/tag/v0.1.0)
+**[Download v0.1.1 source](https://github.com/vkupyansky/spore-crossover-kit/releases/download/v0.1.1/spore-crossover-kit-0.1.1-source.tar.gz)** · [Release and SHA256SUMS](https://github.com/vkupyansky/spore-crossover-kit/releases/tag/v0.1.1)
 
 ## Features
 
@@ -24,15 +24,15 @@ Requires macOS, CrossOver, and separately installed Steam copies of **both Spore
 3. Open a terminal in this directory and run:
 
 ```sh
-./launch-spore.command --bottle SporeCoop
+./launch-spore.command
 ```
 
-The bottle name defaults to `SporeCoop`; despite that historical name, the launcher does not install or use co-op. Use `--bottle NAME` for another name. CrossOver defaults to `/Applications/CrossOver.app`; `--crossover /path/to/CrossOver.app` selects another application location. Bottles must use CrossOver's default location under `~/Library/Application Support/CrossOver/Bottles` and the default Documents mapping.
+The bottle name defaults to `Spore`. Use `--bottle NAME` for another name. CrossOver defaults to `/Applications/CrossOver.app`; `--crossover /path/to/CrossOver.app` selects another application location. Bottles must use CrossOver's default location under `~/Library/Application Support/CrossOver/Bottles` and the default Documents mapping.
 
 To repair the creations path without launching Spore:
 
 ```sh
-./launch-spore.command --bottle SporeCoop --prepare-only
+./launch-spore.command --prepare-only
 ```
 
 This sets the 32-bit Spore registry value `PlayerDir` to `My Spore Creations` and creates that folder in Documents. It preserves the game language. The normal launch checks the live Steam process inside the selected bottle and passes `SteamAppId=24720`, `-dataDir:...\Data`, `-w` and `-r:1920x1080`. It does not start Steam or enable verbose Wine logging.
@@ -41,7 +41,7 @@ This sets the 32-bit Spore registry value `PlayerDir` to `My Spore Creations` an
 
 With the game closed, follow the [graphics recipe](docs/graphics.md). It merges ten preference keys and changes the frame interval to 16 ms in both game configuration directories, giving a theoretical cap of 62.5 FPS.
 
-The [recorded mod selection](docs/mods.md) and [pinned URLs and SHA-256 values](metadata/mods.json) are optional reference material. They are not automatically installed. The standalone setup does not use SporeKit or SporeCoop.
+The [recorded mod selection](docs/mods.md) and [pinned URLs and SHA-256 values](metadata/mods.json) are optional reference material. They are not automatically installed.
 
 ## Package checks
 

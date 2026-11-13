@@ -90,7 +90,18 @@ class LauncherTests(unittest.TestCase):
         result = self.run_launcher("--help")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--prepare-only", result.stdout)
+        self.assertIn("Default bottle: Spore.", result.stdout)
         self.assertEqual(self.calls(), [])
+
+    def test_default_bottle_is_spore(self):
+        bottles = self.home / "Library/Application Support/CrossOver/Bottles"
+        (bottles / self.bottle).rename(bottles / "Spore")
+        result = subprocess.run(
+            ["zsh", str(ROOT / "launch-spore.command"), "--crossover", str(self.app), "--prepare-only"],
+            env=self.env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(all(call[call.index("--bottle") + 1] == "Spore" for call in self.calls()))
 
     def test_launch_quotes_paths_and_passes_explicit_data_directory(self):
         result = self.run_launcher()

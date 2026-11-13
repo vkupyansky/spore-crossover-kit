@@ -4,7 +4,7 @@
 
 Скрипт запуска, настройки графики и небольшие диагностические инструменты, сохранённые из настройки Steam Spore: Galactic Adventures на Mac с Apple silicon.
 
-**[Скачать исходники v0.1.0](https://github.com/vkupyansky/spore-crossover-kit/releases/download/v0.1.0/spore-crossover-kit-0.1.0-source.tar.gz)** · [Выпуск и SHA256SUMS](https://github.com/vkupyansky/spore-crossover-kit/releases/tag/v0.1.0)
+**[Скачать исходники v0.1.1](https://github.com/vkupyansky/spore-crossover-kit/releases/download/v0.1.1/spore-crossover-kit-0.1.1-source.tar.gz)** · [Выпуск и SHA256SUMS](https://github.com/vkupyansky/spore-crossover-kit/releases/tag/v0.1.1)
 
 ## Возможности
 
@@ -24,15 +24,15 @@
 3. Откройте терминал в каталоге проекта и выполните:
 
 ```sh
-./launch-spore.command --bottle SporeCoop
+./launch-spore.command
 ```
 
-Имя бутылки по умолчанию: `SporeCoop`. Это историческое имя: скрипт не устанавливает и не использует кооператив. Для другого имени передайте `--bottle NAME`. По умолчанию CrossOver находится в `/Applications/CrossOver.app`; другое расположение задаётся через `--crossover /path/to/CrossOver.app`. Поддерживается стандартный каталог бутылок `~/Library/Application Support/CrossOver/Bottles` и стандартное подключение Documents.
+Имя бутылки по умолчанию: `Spore`. Для другого имени передайте `--bottle NAME`. По умолчанию CrossOver находится в `/Applications/CrossOver.app`; другое расположение задаётся через `--crossover /path/to/CrossOver.app`. Поддерживается стандартный каталог бутылок `~/Library/Application Support/CrossOver/Bottles` и стандартное подключение Documents.
 
 Исправление пути к творениям без запуска Spore:
 
 ```sh
-./launch-spore.command --bottle SporeCoop --prepare-only
+./launch-spore.command --prepare-only
 ```
 
 Команда устанавливает 32-битное значение реестра Spore `PlayerDir` в `My Spore Creations` и создаёт эту папку в Documents. Язык игры сохраняется. Обычный запуск проверяет живой процесс Steam в выбранной бутылке и передаёт `SteamAppId=24720`, `-dataDir:...\Data`, `-w` и `-r:1920x1080`. Скрипт не запускает Steam и не включает подробные логи Wine.
@@ -41,7 +41,7 @@
 
 При закрытой игре примените [рецепт настройки графики](docs/graphics.md). Он объединяет десять ключей настроек и меняет интервал кадров на 16 мс в обоих каталогах конфигурации игры. Это даёт теоретический предел 62,5 FPS.
 
-[Состав использованной сборки модов](docs/mods.md) и [зафиксированные ссылки и SHA-256](metadata/mods.json) сохранены как дополнительная справка. Автоматической установки нет. Основная настройка не использует SporeKit и SporeCoop.
+[Состав использованной сборки модов](docs/mods.md) и [зафиксированные ссылки и SHA-256](metadata/mods.json) сохранены как дополнительная справка. Автоматической установки нет.
 
 ## Проверка пакетов
 

@@ -1,12 +1,13 @@
 #!/bin/zsh
 set -euo pipefail
 
-bottle='SporeCoop'
+bottle='Spore'
 crossover='/Applications/CrossOver.app'
 prepare_only=0
 
 usage() {
     print -r -- 'Usage: ./launch-spore.command [--bottle NAME] [--crossover PATH] [--prepare-only]'
+    print -r -- 'Default bottle: Spore.'
     print -r -- 'Open and sign in to Steam in that bottle before launching the game.'
     print -r -- '--prepare-only repairs the creations path without starting the game.'
 }
