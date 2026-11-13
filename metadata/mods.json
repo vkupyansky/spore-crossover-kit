@@ -1,0 +1,86 @@
+{
+  "format_version": 1,
+  "game": "Steam Spore + Galactic Adventures 3.1.0.29",
+  "compatibility": "Recorded selection; full gameplay compatibility on CrossOver is unverified.",
+  "loader": {
+    "name": "SporeModLoader",
+    "author": "Rosalie241",
+    "build": "6d7419b",
+    "platform": "macOS arm64",
+    "core_api": "2.5.586.10",
+    "url": "https://github.com/Rosalie241/SporeModLoader/releases/download/rolling-release/SporeModLoader-macos-6d7419b.zip",
+    "sha256": "74f7ad05d42f3ce150906309ed69b06486c9859e83cadfc0a7c9e5ac76793133"
+  },
+  "mods": [
+    {
+      "name": "SporeCrashFix",
+      "version": "0.7",
+      "author": "Rosalie241",
+      "archive": "SporeCrashFix.sporemod",
+      "url": "https://github.com/Rosalie241/SporeCrashFix/releases/download/v0.7/SporeCrashFix.sporemod",
+      "sha256": "dd5d095b5558b9f11e7bb62415aa1fcc06bc8dcf1bf669752b32b837e937f539",
+      "components": [
+        "default"
+      ]
+    },
+    {
+      "name": "Enhanced Color Picker",
+      "version": "1.2",
+      "author": "emd4600",
+      "archive": "EnhancedColorPicker.sporemod",
+      "url": "https://github.com/emd4600/EnhancedColorPickerMod/releases/download/v1.2/EnhancedColorPicker.sporemod",
+      "sha256": "c030811d7a131708e6c34d6c641e83b860a9784dbf008248280fc42a55104cbb",
+      "components": [
+        "default"
+      ]
+    },
+    {
+      "name": "Advanced CE",
+      "version": "3.0.2",
+      "author": "VanillaCold",
+      "archive": "AdvancedCE.sporemod",
+      "url": "https://github.com/VanillaCold/Spore-AdvancedCE/releases/download/3.0.2/AdvancedCE.sporemod",
+      "sha256": "a538fd44b007711f5de2979c56deb2aa5c4f28a4b8c19a1be325baad3c03dd90",
+      "components": [
+        "base",
+        "Suppress Snapping"
+      ],
+      "disabled_components": [
+        "Evo-Outfitter"
+      ]
+    },
+    {
+      "name": "Valla's Editor Camera Fixes",
+      "version": "1.2",
+      "author": "Valla-Chan",
+      "archive": "Valla_EditorCamFix.sporemod",
+      "url": "https://github.com/Valla-Chan/Spore-Mods/releases/download/SporeEditorCameraFix/Valla_EditorCamFix.sporemod",
+      "sha256": "20e0757f79b92538398e60909815ada3056e1ce3228c6d62b428beee85e39fda",
+      "components": [
+        "Default Camera"
+      ]
+    },
+    {
+      "name": "SporeBorderless",
+      "version": "1.2",
+      "author": "Rosalie241",
+      "archive": "SporeBorderless.sporemod",
+      "url": "https://github.com/Rosalie241/SporeBorderless/releases/download/1.2/SporeBorderless.sporemod",
+      "sha256": "44f6a2033f5bb563d2e1733364ced9f8a7949afa6ca9da17f436cb50546bbfae",
+      "components": [
+        "default"
+      ]
+    },
+    {
+      "name": "Universal Property Enhancer",
+      "version": "1.2.0",
+      "author": "Zarklord",
+      "archive": "UPEv1.2.0.sporemod",
+      "url": "https://github.com/Zarklord/UniversalPropertyEnhancer/releases/download/v1.2.0/UPEv1.2.0.sporemod",
+      "sha256": "5975a842ca9d30a37b1656148fab7c40eb83c6f206d441379a5073c27df2c9fe",
+      "components": [
+        "dependency"
+      ]
+    }
+  ]
+}

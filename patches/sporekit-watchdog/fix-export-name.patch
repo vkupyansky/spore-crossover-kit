@@ -1,0 +1,291 @@
+--- a/Makefile
++++ b/Makefile
+@@ -3,6 +3,7 @@
+ CC  := $(LLVM_MINGW)/bin/i686-w64-mingw32-clang
+ CXX := $(LLVM_MINGW)/bin/i686-w64-mingw32-clang++
+ HOSTCXX ?= clang++
++WINE ?= wine
+ 
+ B := build
+ COMMON  := -O2 -g -Wall -Wno-unused-function -Wno-missing-braces -D_WIN32_WINNT=0x0601 -DUNICODE -D_UNICODE
+@@ -20,7 +21,7 @@
+ COOP_SRC := $(wildcard mods/coop/*.cpp) $(wildcard mods/coop/net/*.cpp) $(wildcard updater/*.cpp)
+ COOP_OBJ := $(patsubst %.cpp,$(B)/obj/%.o,$(COOP_SRC))
+ 
+-.PHONY: test-win test-asan test-tsan all loader sporekit coop res setup clean test sanitizer-probe
++.PHONY: test-module-name test-win test-asan test-tsan all loader sporekit coop res setup clean test sanitizer-probe
+ all: loader sporekit coop res setup
+ 
+ # game resources (icons, ...) for SporeCoop: Data/SporeCoop.package
+@@ -155,6 +156,12 @@
+ 
+ # Windows-side unit tests (file handling of the updater and of received worlds), run under Wine in
+ # a lane's bottle by tools/tests/win_unit.py (lab test win_unit)
++test-module-name: $(B)/module_name_tests.exe
++	$(WINE) $(B)/module_name_tests.exe
++$(B)/module_name_tests.exe: tests/module_name_tests.cpp sporekit/module_name.h
++	@mkdir -p $(B)
++	$(CXX) $(CXXFLAGS) -Wextra -Werror -static tests/module_name_tests.cpp -o $@
++
+ test-win: $(B)/win_tests.exe $(B)/SporeCoopSetup.exe
+ $(B)/win_tests.exe: tests/win_tests.cpp installer/install.cpp installer/install.h mods/coop/slotfs.cpp mods/coop/slotfs.h updater/winupdate.cpp updater/pending.h updater/pack.cpp updater/sha256.cpp sporekit/inifile.cpp sporekit/inifile.h
+ 	@mkdir -p $(B)
+--- a/sporekit/watchdog.cpp
++++ b/sporekit/watchdog.cpp
+@@ -2,6 +2,7 @@
+ // dump its stack to the log. Uses only calls that do not take the loader lock, so it
+ // also works when the main thread is stuck inside LoadLibrary/DllMain.
+ #include "core.h"
++#include "module_name.h"
+ 
+ #include <atomic>
+ #include <intrin.h>
+@@ -34,15 +35,10 @@
+         return {};
+     auto* b = (uint8_t*)mbi.AllocationBase;
+     *base_out = (uintptr_t)b;
+-    auto* dos = (IMAGE_DOS_HEADER*)b;
+-    if (dos->e_magic != IMAGE_DOS_SIGNATURE)
+-        return "?";
+-    auto* nt = (IMAGE_NT_HEADERS*)(b + dos->e_lfanew);
+-    auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+-    if (!dir.VirtualAddress)
++    std::string name = detail::image_export_name(reinterpret_cast<uintptr_t>(b));
++    if (name.empty())
+         return b == (uint8_t*)GetModuleHandleW(nullptr) ? "SporeApp.exe" : "?";
+-    auto* exp = (IMAGE_EXPORT_DIRECTORY*)(b + dir.VirtualAddress);
+-    return (const char*)(b + exp->Name);
++    return name;
+ }
+ 
+ static void dump_thread_stack(DWORD tid, const char* why);
+--- /dev/null
++++ b/sporekit/module_name.h
+@@ -0,0 +1,85 @@
++// Bounded PE export-name reads for diagnostics, without taking the loader lock.
++#pragma once
++
++#include <windows.h>
++#include <cstdint>
++#include <cstring>
++#include <limits>
++#include <string>
++
++namespace sk::detail {
++
++template<class T> inline bool read_module_value(uintptr_t address, T& value)
++{
++    SIZE_T read = 0;
++    return ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<const void*>(address), &value,
++                             sizeof(value), &read) && read == sizeof(value);
++}
++
++// Empty means no export directory. "?" means invalid or no longer readable memory.
++inline std::string image_export_name(uintptr_t base)
++{
++    IMAGE_DOS_HEADER dos{};
++    if (!read_module_value(base, dos) || dos.e_magic != IMAGE_DOS_SIGNATURE || dos.e_lfanew <= 0)
++        return "?";
++    const auto offset = static_cast<uintptr_t>(dos.e_lfanew);
++    if (offset > std::numeric_limits<uintptr_t>::max() - base)
++        return "?";
++    const uintptr_t nt_address = base + offset;
++    constexpr size_t prefix_size = sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER);
++    if (prefix_size > std::numeric_limits<uintptr_t>::max() - nt_address)
++        return "?";
++    DWORD signature = 0;
++    WORD magic = 0;
++    if (!read_module_value(nt_address, signature) || signature != IMAGE_NT_SIGNATURE ||
++        !read_module_value(nt_address + prefix_size, magic))
++        return "?";
++
++    IMAGE_DATA_DIRECTORY directory{};
++    DWORD image_size = 0;
++    size_t header_size = 0;
++    if (magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
++        IMAGE_NT_HEADERS32 nt{};
++        if (!read_module_value(nt_address, nt) ||
++            nt.FileHeader.SizeOfOptionalHeader < sizeof(nt.OptionalHeader))
++            return "?";
++        image_size = nt.OptionalHeader.SizeOfImage;
++        header_size = sizeof(nt);
++        if (nt.OptionalHeader.NumberOfRvaAndSizes > IMAGE_DIRECTORY_ENTRY_EXPORT)
++            directory = nt.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
++    } else if (magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
++        IMAGE_NT_HEADERS64 nt{};
++        if (!read_module_value(nt_address, nt) ||
++            nt.FileHeader.SizeOfOptionalHeader < sizeof(nt.OptionalHeader))
++            return "?";
++        image_size = nt.OptionalHeader.SizeOfImage;
++        header_size = sizeof(nt);
++        if (nt.OptionalHeader.NumberOfRvaAndSizes > IMAGE_DIRECTORY_ENTRY_EXPORT)
++            directory = nt.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
++    } else {
++        return "?";
++    }
++    if (image_size > std::numeric_limits<uintptr_t>::max() - base || offset > image_size ||
++        header_size > image_size - offset)
++        return "?";
++    if (!directory.VirtualAddress)
++        return {};
++    if (directory.VirtualAddress > image_size ||
++        sizeof(IMAGE_EXPORT_DIRECTORY) > image_size - directory.VirtualAddress)
++        return "?";
++    IMAGE_EXPORT_DIRECTORY exports{};
++    if (!read_module_value(base + directory.VirtualAddress, exports) || !exports.Name || exports.Name >= image_size)
++        return "?";
++
++    char name[MAX_PATH];
++    const size_t available = image_size - exports.Name;
++    const size_t length = available < sizeof(name) ? available : sizeof(name);
++    SIZE_T read = 0;
++    if (!ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<const void*>(base + exports.Name),
++                           name, length, &read) || read != length)
++        return "?";
++    const auto* end = static_cast<const char*>(std::memchr(name, '\0', length));
++    return end ? std::string(name, static_cast<size_t>(end - name)) : "?";
++}
++
++} // namespace sk::detail
+--- /dev/null
++++ b/tests/module_name_tests.cpp
+@@ -0,0 +1,139 @@
++#define WIN32_LEAN_AND_MEAN
++#define NOMINMAX
++#include "../sporekit/module_name.h"
++#include <cstdio>
++#include <cstdlib>
++#include <memory>
++
++namespace {
++constexpr size_t image_size = 8192;
++constexpr size_t allocation_size = 12288;
++int failures = 0;
++
++struct Release {
++    void operator()(unsigned char* p) const { if (p) VirtualFree(p, 0, MEM_RELEASE); }
++};
++using Image = std::unique_ptr<unsigned char, Release>;
++
++Image image(bool pe64)
++{
++    Image result(static_cast<unsigned char*>(VirtualAlloc(nullptr, allocation_size,
++                 MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE)));
++    if (!result) std::abort();
++    auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(result.get());
++    dos->e_magic = IMAGE_DOS_SIGNATURE;
++    dos->e_lfanew = 128;
++    IMAGE_EXPORT_DIRECTORY exports{};
++    exports.Name = 0x600;
++    std::memcpy(result.get() + 0x500, &exports, sizeof(exports));
++    if (pe64) {
++        IMAGE_NT_HEADERS64 nt{};
++        nt.Signature = IMAGE_NT_SIGNATURE;
++        nt.FileHeader.SizeOfOptionalHeader = sizeof(nt.OptionalHeader);
++        nt.OptionalHeader.Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
++        nt.OptionalHeader.SizeOfImage = image_size;
++        nt.OptionalHeader.NumberOfRvaAndSizes = 1;
++        nt.OptionalHeader.DataDirectory[0] = {0x500, sizeof(exports)};
++        // A PE32 reader mistakes this PE64 field for the export RVA.
++        nt.OptionalHeader.SizeOfHeapCommit = 0x400;
++        std::memcpy(result.get() + 128, &nt, sizeof(nt));
++        IMAGE_EXPORT_DIRECTORY wrong{};
++        wrong.Name = image_size;
++        std::memcpy(result.get() + 0x400, &wrong, sizeof(wrong));
++        std::memcpy(result.get() + 0x600, "fixture64.dll", 14);
++    } else {
++        IMAGE_NT_HEADERS32 nt{};
++        nt.Signature = IMAGE_NT_SIGNATURE;
++        nt.FileHeader.SizeOfOptionalHeader = sizeof(nt.OptionalHeader);
++        nt.OptionalHeader.Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
++        nt.OptionalHeader.SizeOfImage = image_size;
++        nt.OptionalHeader.NumberOfRvaAndSizes = 1;
++        nt.OptionalHeader.DataDirectory[0] = {0x500, sizeof(exports)};
++        std::memcpy(result.get() + 128, &nt, sizeof(nt));
++        std::memcpy(result.get() + 0x600, "fixture32.dll", 14);
++    }
++    DWORD old = 0;
++    if (!VirtualProtect(result.get() + image_size, allocation_size - image_size, PAGE_NOACCESS, &old))
++        std::abort();
++    return result;
++}
++
++void check(const char* name, const std::string& actual, const char* expected)
++{
++    if (actual != expected) { std::fprintf(stderr, "FAIL %s: %s\n", name, actual.c_str()); ++failures; }
++    else std::printf("PASS %s\n", name);
++}
++
++LONG WINAPI unexpected_fault(EXCEPTION_POINTERS*) { ExitProcess(87); return EXCEPTION_EXECUTE_HANDLER; }
++
++// The former header reader, isolated here so its PE64 regression must fail.
++std::string legacy_name(unsigned char* base)
++{
++    auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(base);
++    auto* nt = reinterpret_cast<IMAGE_NT_HEADERS32*>(base + dos->e_lfanew);
++    auto& directory = nt->OptionalHeader.DataDirectory[0];
++    auto* exports = reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(base + directory.VirtualAddress);
++    return reinterpret_cast<const char*>(base + exports->Name);
++}
++}
++
++int main(int argc, char** argv)
++{
++    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
++    SetUnhandledExceptionFilter(unexpected_fault);
++    if (argc == 2 && std::strcmp(argv[1], "--legacy") == 0) {
++        auto fixture = image(true);
++        check("legacy PE64", legacy_name(fixture.get()), "fixture64.dll");
++        return failures ? 1 : 0;
++    }
++    auto fixture = image(false);
++    const uintptr_t base = reinterpret_cast<uintptr_t>(fixture.get());
++    check("PE32 export", sk::detail::image_export_name(base), "fixture32.dll");
++    auto fixture64 = image(true);
++    check("PE64 export", sk::detail::image_export_name(reinterpret_cast<uintptr_t>(fixture64.get())), "fixture64.dll");
++    auto* exports = reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(fixture.get() + 0x500);
++    exports->Name = 0x040000ba;
++    check("out-of-image name RVA", sk::detail::image_export_name(base), "?");
++    exports->Name = 0x1ff0;
++    std::memset(fixture.get() + 0x1ff0, 'x', 16);
++    check("unterminated name at image end", sk::detail::image_export_name(base), "?");
++    exports->Name = 0x600;
++    DWORD old = 0;
++    if (!VirtualProtect(fixture.get(), 4096, PAGE_NOACCESS, &old)) std::abort();
++    check("unreadable image header", sk::detail::image_export_name(base), "?");
++    if (!VirtualProtect(fixture.get(), 4096, PAGE_READWRITE, &old)) std::abort();
++    auto* nt = reinterpret_cast<IMAGE_NT_HEADERS32*>(fixture.get() + 128);
++    nt->OptionalHeader.DataDirectory[0].VirtualAddress = 0x1ff0;
++    check("truncated export directory", sk::detail::image_export_name(base), "?");
++    nt->OptionalHeader.DataDirectory[0].VirtualAddress = 0;
++    check("no export directory", sk::detail::image_export_name(base), "");
++    nt->OptionalHeader.Magic = 0x999;
++    check("unsupported optional header", sk::detail::image_export_name(base), "?");
++    auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(fixture.get());
++    dos->e_lfanew = 0x70000000;
++    check("overflowing or unreadable NT header", sk::detail::image_export_name(base), "?");
++    fixture.reset();
++    check("image unmapped after VirtualQuery", sk::detail::image_export_name(base), "?");
++    wchar_t executable[MAX_PATH];
++    const DWORD count = GetModuleFileNameW(nullptr, executable, MAX_PATH);
++    if (!count || count == MAX_PATH) std::abort();
++    std::wstring command = L"\"" + std::wstring(executable, count) + L"\" --legacy";
++    STARTUPINFOW startup{};
++    startup.cb = sizeof(startup);
++    PROCESS_INFORMATION process{};
++    if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
++                        nullptr, nullptr, &startup, &process)) std::abort();
++    const DWORD wait = WaitForSingleObject(process.hProcess, 5000);
++    DWORD exit_code = 0;
++    if (wait != WAIT_OBJECT_0) {
++        TerminateProcess(process.hProcess, 88);
++        WaitForSingleObject(process.hProcess, 5000);
++    }
++    if (!GetExitCodeProcess(process.hProcess, &exit_code)) std::abort();
++    CloseHandle(process.hThread);
++    CloseHandle(process.hProcess);
++    if (wait == WAIT_OBJECT_0 && exit_code == 87) std::puts("PASS former reader faults on PE64 guard page");
++    else { std::fprintf(stderr, "FAIL former reader regression: exit %lu\n", exit_code); ++failures; }
++    std::printf("%d failures\n", failures);
++    return failures ? 1 : 0;
++}

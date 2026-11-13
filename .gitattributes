@@ -1,0 +1,2 @@
+# Unified-diff context preserves blank-line markers and Makefile tab indentation.
+patches/sporekit-watchdog/fix-export-name.patch whitespace=-blank-at-eol,-space-before-tab
